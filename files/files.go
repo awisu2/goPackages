@@ -7,13 +7,20 @@ import(
   "strings"
 )
 
+/**
+ * ディレクトリを再帰的に取得するためのConfig
+ */
+type WalkDirsConfig struct {
+  MaxDeep int
+  SkipDirs []string
+}
 
 /**
  * 階層を潜り、ファイルとパスを取得
  * @param  {[type]} dir string)       ([]string, []string [description]
  * @return {[type]}     [description]
  */
-func WalkWithOption(dir string, maxDeep int, skipDirs []string) (files []string, dirs []string) {
+func WalkDirs(dir string, config WalkDirsConfig) (files []string, dirs []string) {
   // Walk内で変換処理を走らせたくないので事前取得
   separator := string(filepath.Separator)
 
@@ -23,7 +30,7 @@ func WalkWithOption(dir string, maxDeep int, skipDirs []string) (files []string,
     rel, err := filepath.Rel(dir, path)
     if info.Mode().IsDir() {
       // check skipDirs
-      for _, skipDir := range skipDirs {
+      for _, skipDir := range config.SkipDirs {
         if (info.Name() == skipDir) {
           return filepath.SkipDir
         }
@@ -41,7 +48,7 @@ func WalkWithOption(dir string, maxDeep int, skipDirs []string) (files []string,
       }
 
       // check deep (0: infinity)
-      if (maxDeep > 0 && deep >= maxDeep) { return filepath.SkipDir }
+      if (config.MaxDeep > 0 && deep >= config.MaxDeep) { return filepath.SkipDir }
 
       return nil
     }

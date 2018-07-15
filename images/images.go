@@ -53,6 +53,7 @@ func GetFormatByWord(word string) Format {
 }
 
 /**
+ * 対象ファイルのimage.DecodeConfigの値を返却
  * Decodeは同じストリーム内で行うとエラーになるため関数に分ける
  */
 func DecodeConfig(src string) (config image.Config, format Format, err error) {
