@@ -5,14 +5,17 @@ import(
   "path/filepath"
   "os"
   "strings"
+  "io/ioutil"
 )
 
 /**
  * ディレクトリを再帰的に取得するためのConfig
  */
 type WalkDirsConfig struct {
-  MaxDeep int
-  SkipDirs []string
+  MaxDeep int // 最大探索震度(0: infinity)
+  SkipDirs []string // no search directory names
+  NoFile bool // ファイルを対象外とする
+  NoDir bool // ディレクトリを対象外とする
 }
 
 /**
@@ -29,6 +32,11 @@ func WalkDirs(dir string, config WalkDirsConfig) (files []string, dirs []string)
 
     rel, err := filepath.Rel(dir, path)
     if info.Mode().IsDir() {
+      // 設定がある場合を対象外とする(ディレクトリ)
+      if (config.NoDir) {
+        return nil
+      }
+
       // check skipDirs
       for _, skipDir := range config.SkipDirs {
         if (info.Name() == skipDir) {
@@ -41,7 +49,7 @@ func WalkDirs(dir string, config WalkDirsConfig) (files []string, dirs []string)
       deep := 0
       // . はTopディレクトリ
       if (rel != ".") {
-        deep = strings.Count(rel, separator) + 1
+        deep = strings.Count(rel, separator)
 
         // スキップ処理はするが、同階層のディレクトリ情報は取得
         dirs = append(dirs, path)
@@ -50,6 +58,11 @@ func WalkDirs(dir string, config WalkDirsConfig) (files []string, dirs []string)
       // check deep (0: infinity)
       if (config.MaxDeep > 0 && deep >= config.MaxDeep) { return filepath.SkipDir }
 
+      return nil
+    }
+
+    // 設定がある場合を対象外とする(ファイル)
+    if (config.NoFile) {
       return nil
     }
 
@@ -64,5 +77,47 @@ func WalkDirs(dir string, config WalkDirsConfig) (files []string, dirs []string)
 func SepalateExt(path string) (base, ext string){
   ext = filepath.Ext(path)
   base = path[0:len(path)-len(ext)]
+  return
+}
+
+/**
+ * ディレクトリの直下にあるディレクトリをリスト取得
+ * filepath.Walkはどうも遅いので、通常はこちらを利用する
+ * TODO: 再帰的な取得
+ * @param {[type]} dirname string) (files []string, err error [description]
+ */
+func GetCurrentDirs(dirname string) (dirs []string, err error) {
+  fs, err := ioutil.ReadDir(dirname)
+  if err != nil {
+    return
+  }
+
+  for _, f := range fs {
+    if (f.IsDir()) {
+      path := filepath.Join(dirname, f.Name())
+      dirs = append(dirs, path)
+    }
+  }
+  return
+}
+
+/**
+ * ディレクトリの直下にあるファイルをリスト取得
+ * filepath.Walkはどうも遅いので、通常はこちらを利用する
+ * TODO: 再帰的な取得
+ * @param {[type]} dirname string) (files []string, err error [description]
+ */
+func GetCurrentFiles(dirname string) (files []string, err error) {
+  fs, err := ioutil.ReadDir(dirname)
+  if err != nil {
+    return
+  }
+
+  for _, f := range fs {
+    if (!f.IsDir()) {
+      path := filepath.Join(dirname, f.Name())
+      files = append(files, path)
+    }
+  }
   return
 }
