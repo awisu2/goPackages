@@ -3,8 +3,13 @@ package zip
 import (
 	"archive/zip"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/saintfish/chardet"
+
+	"github.com/awisu2/goPackages/transform"
 )
 
 func Unzip(src, dest string) ([]string, error) {
@@ -16,6 +21,7 @@ func Unzip(src, dest string) ([]string, error) {
 	}
 	defer r.Close()
 
+	det := chardet.NewTextDetector()
 	for _, f := range r.File {
 
 		rc, err := f.Open()
@@ -24,8 +30,19 @@ func Unzip(src, dest string) ([]string, error) {
 		}
 		defer rc.Close()
 
+		// ShiftJISの場合,encodeをutf8にする
+		fName := f.Name
+		res, err := det.DetectBest([]byte(fName))
+		if res.Charset == "Shift_JIS" {
+			fName, err = transform.Sjis2Utf8(fName)
+			if err != nil {
+				log.Println(err)
+				return nil, err
+			}
+		}
+
 		// Store filename/path for returning and using later on
-		fpath := filepath.Join(dest, f.Name)
+		fpath := filepath.Join(dest, fName)
 		files = append(files, fpath)
 
 		if f.FileInfo().IsDir() {
