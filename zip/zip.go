@@ -23,7 +23,6 @@ func Unzip(src, dest string) ([]string, error) {
 
 	det := chardet.NewTextDetector()
 	for _, f := range r.File {
-
 		rc, err := f.Open()
 		if err != nil {
 			return files, err
@@ -33,8 +32,15 @@ func Unzip(src, dest string) ([]string, error) {
 		// ShiftJISの場合,encodeをutf8にする
 		fName := f.Name
 		res, err := det.DetectBest([]byte(fName))
-		if res.Charset == "Shift_JIS" {
+		switch res.Charset {
+		case "Shift_JIS", "windows-1252":
 			fName, err = transform.Sjis2Utf8(fName)
+			if err != nil {
+				log.Println(err)
+				return nil, err
+			}
+		case "EUC-KR", "EUC-JP":
+			fName, err = transform.Eucjp2Utf8(fName)
 			if err != nil {
 				log.Println(err)
 				return nil, err
