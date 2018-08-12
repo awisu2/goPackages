@@ -33,7 +33,7 @@ func Unzip(src, dest string) ([]string, error) {
 		fName := f.Name
 		res, err := det.DetectBest([]byte(fName))
 		switch res.Charset {
-		case "Shift_JIS", "windows-1252":
+		case "Shift_JIS", "windows-1252", "windows-1254", "ISO-8859-6", "Big5", "GB-18030":
 			fName, err = transform.Sjis2Utf8(fName)
 			if err != nil {
 				log.Println(err)
@@ -45,6 +45,15 @@ func Unzip(src, dest string) ([]string, error) {
 				log.Println(err)
 				return nil, err
 			}
+		case "UTF-8":
+		// 知らないフォーマットの場合はとりあえずshiftjisから変換させておく
+		default:
+			fName, err = transform.Sjis2Utf8(fName)
+			if err != nil {
+				log.Println(err)
+				return nil, err
+			}
+			log.Printf("unknown charset: %s, char: %s, conv: %s", res.Charset, f.Name, fName)
 		}
 
 		// Store filename/path for returning and using later on
