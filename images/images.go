@@ -1,10 +1,13 @@
 package images
 
 import (
+	"bufio"
+	"bytes"
 	"image"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"io"
 	"log"
 	"os"
 
@@ -73,6 +76,23 @@ func DecodeConfig(src string) (config image.Config, format Format, err error) {
 	return
 }
 
+func DecodeByFile(src string) (image.Image, string, error) {
+	// get file
+	file, err := os.Open(src)
+	if err != nil {
+		return nil, "", err
+	}
+	defer file.Close() // latest close
+
+	// Decode(get image)
+	img, name, err := image.Decode(file)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return img, name, nil
+}
+
 /**
  * 拡張子を確認し返却
  * 頭に.付きでチェック
@@ -91,42 +111,40 @@ type ConvertOption struct {
 	Format    Format
 }
 
-func Converte(src, dist string, option ConvertOption) (err error) {
-	config, format, err := DecodeConfig(src)
+func Converte(src string, option ConvertOption) (img image.Image, err error) {
+	// 処理可能なフォーマットか確認
+	_, format, err := DecodeConfig(src)
 	if err != nil {
 		return
 	}
-
-	// 指定がフォーマットを取得
 	if option.Format != Unknown {
 		format = option.Format
 	}
 
 	// get file
-	file, err := os.Open(src)
-	if err != nil {
-		return
-	}
-	defer file.Close() // latest close
-
-	// Decode
-	img, _, err := image.Decode(file)
+	img, _, err = DecodeByFile(src)
 	if err != nil {
 		return
 	}
 
 	// Resize
-	if option.MaxHeight > 0 && config.Height >= option.MaxHeight {
-		// calc size
-		rate := float64(option.MaxHeight) / float64(config.Height)
-		width := uint(float64(config.Width) * rate)
-		height := uint(float64(config.Height) * rate)
-
-		// set image
-		img = resize.Resize(width, height, img, resize.Lanczos3)
+	size := GetSize(img)
+	if option.MaxHeight > 0 && size.Y >= option.MaxHeight {
+		img = ResizeByHeight(img, option.MaxHeight)
 	}
 
-	err = Save(dist, format, img)
+	// change format
+	// save
+	b := new(bytes.Buffer)
+	writer := bufio.NewWriter(b)
+	err = ChangeFormat(writer, format, img)
+	if err != nil {
+		return
+	}
+
+	// 画像ファイルに変換
+	reader := bufio.NewReader(b)
+	img, _, err = image.Decode(reader)
 	if err != nil {
 		return
 	}
@@ -134,28 +152,56 @@ func Converte(src, dist string, option ConvertOption) (err error) {
 	return
 }
 
-func Save(dist string, format Format, img image.Image) (err error) {
-	// create file
-	out, err := os.Create(dist)
-	if err != nil {
-		return
-	}
-	defer out.Close()
+func ResizeByHeight(img image.Image, height int) image.Image {
+	size := GetSize(img)
+	log.Printf("%v, %v", img.Bounds().Min, img.Bounds().Max)
+	rate := float64(height) / float64(size.Y)
+	_width := uint(float64(size.X) * rate)
+	_height := uint(float64(size.Y) * rate)
 
-	// save
+	// set image
+	img = resize.Resize(_width, _height, img, resize.Lanczos3)
+	return img
+}
+
+// IMAGEオブジェクトからサイズを取得
+func GetSize(img image.Image) image.Point {
+	point := image.Point{
+		X: img.Bounds().Max.X - img.Bounds().Min.X,
+		Y: img.Bounds().Max.Y - img.Bounds().Min.Y,
+	}
+	return point
+}
+
+func ChangeFormat(writer io.Writer, format Format, img image.Image) error {
 	switch format {
 	case Jpeg, Jpg:
 		opts := &jpeg.Options{Quality: 70}
-		jpeg.Encode(out, img, opts)
+		jpeg.Encode(writer, img, opts)
 	case Png:
-		png.Encode(out, img)
+		png.Encode(writer, img)
 	case Gif:
 		// TODO: 未完成
 		opts := &gif.Options{NumColors: 256}
-		gif.Encode(out, img, opts)
+		gif.Encode(writer, img, opts)
 	default:
 		log.Print("no format")
 	}
 
-	return
+	return nil
+}
+
+func SaveJpegToFile(img image.Image, dest string) error {
+	f, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	err = ChangeFormat(f, Jpeg, img)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
