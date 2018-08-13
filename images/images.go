@@ -129,7 +129,7 @@ func Converte(src string, option ConvertOption) (img image.Image, err error) {
 
 	// Resize
 	size := GetSize(img)
-	if option.MaxHeight > 0 && size.Y >= option.MaxHeight {
+	if option.MaxHeight > 0 && size.Y > option.MaxHeight {
 		img = ResizeByHeight(img, option.MaxHeight)
 	}
 
@@ -154,7 +154,6 @@ func Converte(src string, option ConvertOption) (img image.Image, err error) {
 
 func ResizeByHeight(img image.Image, height int) image.Image {
 	size := GetSize(img)
-	log.Printf("%v, %v", img.Bounds().Min, img.Bounds().Max)
 	rate := float64(height) / float64(size.Y)
 	_width := uint(float64(size.X) * rate)
 	_height := uint(float64(size.Y) * rate)
